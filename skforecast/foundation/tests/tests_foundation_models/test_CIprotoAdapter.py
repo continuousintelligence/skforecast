@@ -11,17 +11,24 @@ from sklearn.base import clone
 
 from skforecast.foundation import FoundationModel, ForecasterFoundation, get_model_info
 from skforecast.foundation._adapters import CIprotoAdapter
+from .fixtures_adapters import FakeTorch
 
-torch = pytest.importorskip("torch")
 MODEL_ID = "ContinuousIntelligence/ci-proto"
+
+
+@pytest.fixture(autouse=True)
+def fake_torch(monkeypatch):
+    """Use the same lightweight torch stand-in as the other adapter tests."""
+    monkeypatch.setitem(sys.modules, "torch", FakeTorch)
 
 
 class FakeCIprotoModel:
     """Mirror the published Forecaster signature and record per-series inputs."""
 
     def __init__(self, quantiles=None):
-        self.quantiles = torch.tensor(
-            CIprotoAdapter.SUPPORTED_QUANTILES if quantiles is None else quantiles
+        self.quantiles = np.asarray(
+            CIprotoAdapter.SUPPORTED_QUANTILES if quantiles is None else quantiles,
+            dtype=np.float32,
         )
         self.calls = []
 
@@ -41,7 +48,7 @@ class FakeCIprotoModel:
     ):
         self.calls.append(
             {
-                "history": history.clone(),
+                "history": history.copy(),
                 "horizon": horizon,
                 "past_covariates": past_covariates,
                 "future_covariates": future_covariates,
@@ -55,7 +62,7 @@ class FakeCIprotoModel:
         return (
             history[:, -1, None, None]
             + self.quantiles[None, :, None]
-            + torch.arange(horizon)[None, None, :]
+            + np.arange(horizon, dtype=np.float32)[None, None, :]
         )
 
 
@@ -179,7 +186,7 @@ def test_missing_checkpoint_quantile_fails_before_forecasting():
 @pytest.mark.parametrize("shape", [(1, 9, 1), (2, 9, 2), (1, 2, 9), (9, 2)])
 def test_malformed_backend_output(shape):
     backend = FakeCIprotoModel()
-    backend.forecast = lambda **kwargs: torch.zeros(shape)
+    backend.forecast = lambda **kwargs: np.zeros(shape)
     adapter = CIprotoAdapter(MODEL_ID, model=backend)
     with pytest.raises(ValueError, match="unexpected forecast shape"):
         adapter.predict(2, {"sales": make_context()}, None, None, None)
@@ -193,11 +200,11 @@ def test_dated_unequal_contexts_keep_their_own_lengths_and_origins():
     before = {name: series.copy() for name, series in context.items()}
     adapter.predict(3, context, None, None, None)
     later, earlier = backend.calls
-    assert later["history"].dtype == torch.float32
+    assert later["history"].dtype == np.float32
     assert later["history"].shape == (1, 4)
     assert earlier["history"].shape == (1, 2)
     np.testing.assert_allclose(earlier["history"][0], [1, 2])
-    assert torch.isnan(later["history"][0, 1])
+    assert np.isnan(later["history"][0, 1])
     assert later["freq"] == earlier["freq"] == "D"
     assert later["series_ids"] is earlier["series_ids"] is None
     expected = pd.date_range("2026-01-01", periods=5, freq="D").as_unit("ns").asi8

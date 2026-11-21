@@ -1,9 +1,14 @@
 # Tests of full-history foundation backtesting.
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from skforecast.foundation import FoundationModel, ForecasterFoundation
+from skforecast.foundation.tests.tests_foundation_models.fixtures_adapters import (
+    FakeTorch,
+)
 from skforecast.foundation.tests.tests_foundation_models.test_CIprotoAdapter import (
     FakeCIprotoModel,
     MODEL_ID,
@@ -12,7 +17,10 @@ from skforecast.model_selection import TimeSeriesFold, backtesting_foundation
 
 
 @pytest.mark.parametrize("context_length", [None, 64])
-def test_backtesting_keeps_full_history_unless_a_limit_is_requested(context_length):
+def test_backtesting_keeps_full_history_unless_a_limit_is_requested(
+    context_length, monkeypatch
+):
+    monkeypatch.setitem(sys.modules, "torch", FakeTorch)
     initial_size = 16400
     series = pd.Series(np.arange(initial_size + 4, dtype=float), name="sales")
     exog = pd.DataFrame({"past": series + 1, "known": series + 2})
