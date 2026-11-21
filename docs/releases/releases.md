@@ -12,6 +12,11 @@ All significant changes to this project are documented in this release file.
 
 
 
+## Unreleased
+
++ <span class="badge text-bg-feature">Feature</span> New `CIprotoAdapter` adds Continuous Intelligence ci-proto to `FoundationModel` and `ForecasterFoundation`, supporting context windows of up to **2 million observations**, with automatic selection between variants tuned for shorter and longer histories, past-only, known-future and categorical covariates, and native decile forecasts. [User guide](../user_guides/foundation-ci-proto.md)
+
+
 ## 0.27.0 <small>Nov 11, 2026</small> { id="0.27.0" }
 
 The main changes in this release are:
